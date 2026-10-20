@@ -1,0 +1,18 @@
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: avcgarcia-artschool_web_1
+      APP_PORT: 3000
+
+  web:
+    image: brittinho/artschool:1.0.1@sha256:07ad0a36e795628afab9ff3cd815c6b3a900fb776105e94a37213e59c68c8180
+    restart: on-failure
+    volumes:
+      - ${UMBREL_ROOT}/home/Videos/Cursos:/courses:ro
+      - ${APP_DATA_DIR}/data:/app/data
+    environment:
+      COURSES_PATH: /courses
+      DATA_PATH: /app/data
+      PORT: 3000

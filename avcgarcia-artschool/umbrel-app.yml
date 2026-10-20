@@ -1,0 +1,21 @@
+manifestVersion: 1
+id: avcgarcia-artschool
+category: media
+name: Art School
+version: "1.0.1"
+tagline: Plataforma self-hosted para seus cursos em vídeo
+description: >-
+  Escaneia uma pasta de cursos, rastreia progresso, notas e legendas.
+releaseNotes: ""
+developer: britto64
+website: https://github.com/britto64/art-school
+dependencies: []
+repo: https://github.com/britto64/art-school
+support: https://github.com/britto64/art-school/issues
+port: 8742
+gallery: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+submitter: avcgarcia
+submission: ""
