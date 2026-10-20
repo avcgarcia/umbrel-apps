@@ -4,6 +4,7 @@ Community App Store pessoal para umbrelOS.
 
 
 # PROMPT IA
+```
 Tenho um servidor umbrelOS (x86_64 / amd64) e mantenho uma Community App Store
 própria no GitHub para instalar apps que não estão na loja oficial.
 
@@ -45,3 +46,4 @@ COMO QUERO SER INSTRUÍDO
 
 APP QUE QUERO INSTALAR AGORA:
 <cole aqui o link do GitHub ou Docker Hub do app>
+```
