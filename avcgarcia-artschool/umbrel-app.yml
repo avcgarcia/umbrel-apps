@@ -1,6 +1,7 @@
 manifestVersion: 1
 id: avcgarcia-artschool
 category: media
+icon: https://raw.githubusercontent.com/avcgarcia/umbrel-apps/main/avcgarcia-artschool/icon.svg
 name: Art School
 version: "1.0.1"
 tagline: Plataforma self-hosted para seus cursos em vídeo
