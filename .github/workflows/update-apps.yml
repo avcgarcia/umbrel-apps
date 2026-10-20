@@ -1,0 +1,92 @@
+name: Atualizar apps
+
+on:
+  schedule:
+    - cron: "17 9 * * *"   # todo dia, 06:17 (horário de Brasília)
+  workflow_dispatch:        # permite rodar manualmente pela aba Actions
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verificar novas versões no Docker Hub
+        run: |
+          python3 - <<'PY'
+          import json, re, pathlib, urllib.request
+
+          def semver(tag):
+              m = re.fullmatch(r"v?(\d+)\.(\d+)\.(\d+)", tag)
+              return tuple(map(int, m.groups())) if m else None
+
+          def hub_tags(image):
+              if image.split("/")[0].count(".") or ":" in image.split("/")[0]:
+                  return None  # outro registry (ghcr.io etc.), ignora
+              repo = image if "/" in image else f"library/{image}"
+              url = f"https://hub.docker.com/v2/repositories/{repo}/tags?page_size=100"
+              tags = []
+              for _ in range(5):
+                  with urllib.request.urlopen(url, timeout=30) as r:
+                      data = json.load(r)
+                  tags += data.get("results", [])
+                  url = data.get("next")
+                  if not url:
+                      break
+              return tags
+
+          img_re = re.compile(
+              r"^(?P<pre>\s*image:\s*)(?P<name>[\w.\-/]+):(?P<tag>[\w.\-]+)(?:@sha256:[0-9a-f]{64})?\s*$",
+              re.M,
+          )
+
+          for manifest in sorted(pathlib.Path(".").glob("*/umbrel-app.yml")):
+              compose = manifest.parent / "docker-compose.yml"
+              if not compose.exists():
+                  continue
+              text = compose.read_text()
+              app_version = None
+
+              def repl(m):
+                  global app_version
+                  cur = semver(m["tag"])
+                  if not cur:
+                      return m.group(0)
+                  tags = hub_tags(m["name"])
+                  if not tags:
+                      return m.group(0)
+                  best = max(
+                      (t for t in tags if semver(t["name"]) and t.get("digest")),
+                      key=lambda t: semver(t["name"]),
+                      default=None,
+                  )
+                  if not best or semver(best["name"]) <= cur:
+                      return m.group(0)
+                  print(f"{manifest.parent}: {m['name']} {m['tag']} -> {best['name']}")
+                  if app_version is None:
+                      app_version = best["name"].lstrip("v")
+                  return f"{m['pre']}{m['name']}:{best['name']}@{best['digest']}"
+
+              new_text = img_re.sub(repl, text)
+              if new_text != text:
+                  compose.write_text(new_text)
+                  if app_version:
+                      mt = manifest.read_text()
+                      mt = re.sub(r'^version:.*$', f'version: "{app_version}"', mt, count=1, flags=re.M)
+                      manifest.write_text(mt)
+          PY
+
+      - name: Salvar alterações
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Nenhuma atualização encontrada."
+          else
+            git commit -m "Atualiza versões dos apps"
+            git push
+          fi
