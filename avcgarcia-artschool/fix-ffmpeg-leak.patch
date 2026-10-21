@@ -1,0 +1,91 @@
+diff --git a/src/api.ts b/src/api.ts
+index f7625c2..ed1d5ab 100644
+--- a/src/api.ts
++++ b/src/api.ts
+@@ -346,6 +346,26 @@ api.get("/lessons/:id", (req, res) => {
+ });
+ 
+ // ---------- Streaming ----------
++// Envia o mp4 fragmentado do ffmpeg. O "close" precisa ser observado ANTES do await:
++// se o cliente sai enquanto o ffprobe roda (seek/troca de aula), o evento já passou e
++// um ffmpeg criado depois ficaria preso para sempre escrevendo num socket morto.
++async function sendRemux(res: import("express").Response, file: string, startSec: number, transcode: boolean) {
++  let ff: ReturnType<typeof remuxStream> | null = null;
++  let gone = false;
++  res.on("close", () => {
++    gone = true;
++    try {
++      ff?.kill("SIGKILL");
++    } catch {}
++  });
++  const codecs = await probeCodecs(file);
++  if (gone) return;
++  res.setHeader("Content-Type", "video/mp4");
++  ff = remuxStream(file, startSec, transcode, codecs);
++  ff.on("error", () => res.destroy());
++  ff.stdout.pipe(res);
++}
++
+ api.get("/stream/:id", async (req, res) => {
+   const lesson = db.prepare("SELECT rel_path FROM lessons WHERE id = ?").get(req.params.id) as
+     | { rel_path: string }
+@@ -384,17 +404,7 @@ api.get("/stream/:id", async (req, res) => {
+ 
+   // Remux (mkv etc.): mp4 fragmentado via ffmpeg; seek = novo request com ?t=
+   const startSec = Math.max(0, Number(req.query.t) || 0);
+-  const codecs = await probeCodecs(file);
+-  res.setHeader("Content-Type", "video/mp4");
+-  const ff = remuxStream(file, startSec, transcode, codecs);
+-  ff.stdout.pipe(res);
+-  const kill = () => {
+-    try {
+-      ff.kill("SIGKILL");
+-    } catch {}
+-  };
+-  res.on("close", kill);
+-  ff.on("error", () => res.destroy());
++  await sendRemux(res, file, startSec, transcode);
+ });
+ 
+ // ---------- Legendas (SRT -> WebVTT) ----------
+@@ -445,17 +455,7 @@ api.get("/materials/:id/view", async (req, res) => {
+ 
+   if (kind === "video" && !DIRECT_PLAY.has(ext)) {
+     // .mov/.mkv/.avi: remux para mp4 fragmentado, igual às aulas
+-    const codecs = await probeCodecs(file);
+-    res.setHeader("Content-Type", "video/mp4");
+-    const ff = remuxStream(file, 0, false, codecs);
+-    ff.stdout.pipe(res);
+-    const kill = () => {
+-      try {
+-        ff.kill("SIGKILL");
+-      } catch {}
+-    };
+-    res.on("close", kill);
+-    ff.on("error", () => res.destroy());
++    await sendRemux(res, file, 0, false);
+     return;
+   }
+ 
+diff --git a/src/ffmpeg.ts b/src/ffmpeg.ts
+index ea79edb..bcb93f1 100644
+--- a/src/ffmpeg.ts
++++ b/src/ffmpeg.ts
+@@ -336,13 +336,16 @@ export function probeCodecs(absPath: string): Promise<MediaCodecs> {
+  * e trilhas extras são descartados — eles quebram o mux mp4 (era o que travava mkv/mov).
+  */
+ export function remuxStream(absPath: string, startSec: number, transcode: boolean, codecs: MediaCodecs) {
++  const copyVideo = !transcode && codecs.video !== null && COPY_VIDEO.has(codecs.video);
+   const args = ["-hide_banner", "-loglevel", "error"];
++  // vídeo copiado começa no keyframe anterior ao -ss; sem -noaccurate_seek o áudio
++  // começaria no ponto exato, deixando um buraco que o browser ignora (áudio adiantado)
++  if (startSec > 0 && copyVideo) args.push("-noaccurate_seek");
+   if (startSec > 0) args.push("-ss", String(startSec));
+   args.push("-i", absPath);
+   // só a primeira trilha de vídeo/áudio; sem legendas/attachments/dados
+   args.push("-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn", "-map_metadata", "-1");
+ 
+-  const copyVideo = !transcode && codecs.video !== null && COPY_VIDEO.has(codecs.video);
+   if (copyVideo) {
+     args.push("-c:v", "copy");
+     if (codecs.video === "hevc") args.push("-tag:v", "hvc1"); // sem a tag o browser não reconhece hevc

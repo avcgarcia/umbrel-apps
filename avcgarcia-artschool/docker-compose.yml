@@ -5,12 +5,17 @@ services:
     environment:
       APP_HOST: avcgarcia-artschool_web_1
       APP_PORT: 3000
+      # O gateway do Umbrel não fecha a conexão com o app quando a aba do navegador
+      # fecha; sem timeout, cada vídeo abandonado deixa um ffmpeg preso para sempre.
+      # 15 min de inatividade (ms).
+      PROXY_TIMEOUT: 900000
 
   web:
-    image: brittinho/artschool:1.0.1@sha256:07ad0a36e795628afab9ff3cd815c6b3a900fb776105e94a37213e59c68c8180
+    # britto64/art-school v1.0.1 + correções de vazamento de ffmpeg e sincronia A/V
+    image: ghcr.io/avcgarcia/artschool:1.0.1-fix1@sha256:b1b92718b0e38099cdb206cda63402c9b70380610f94e0fb5cd17f77a4a08c71
     restart: on-failure
     volumes:
-      - ${UMBREL_ROOT}/home/Videos/Cursos:/courses:ro
+      - ${UMBREL_ROOT}/home/Videos:/courses:ro
       - ${APP_DATA_DIR}/data:/app/data
     environment:
       COURSES_PATH: /courses

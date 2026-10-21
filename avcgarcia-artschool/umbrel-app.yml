@@ -3,11 +3,14 @@ id: avcgarcia-artschool
 category: media
 icon: https://raw.githubusercontent.com/avcgarcia/umbrel-apps/main/avcgarcia-artschool/icon.svg
 name: Art School
-version: "1.0.1"
+version: "1.0.1-fix1"
 tagline: Plataforma self-hosted para seus cursos em vídeo
 description: >-
   Escaneia uma pasta de cursos, rastreia progresso, notas e legendas.
-releaseNotes: ""
+releaseNotes: >-
+  Áudio e vídeo agora ficam sincronizados ao retomar ou avançar uma aula sem o modo
+  de compatibilidade, o que evita recodificar o vídeo e reduz o uso de CPU.
+  Processos ffmpeg não ficam mais presos depois de fechar a aba do player.
 developer: britto64
 website: https://github.com/britto64/art-school
 dependencies: []
